@@ -8,17 +8,17 @@ using Knet, IterTools
 using JLD2
 
 # Definition of a convolutional layer (without pooling):
-struct Conv1; w; b; f; pd; p; s; end
+mutable struct Conv1; w; b; f; pd; p; s; end
 (c1::Conv1)(x) = c1.f.(conv4(c1.w, dropout(x,c1.pd); padding=c1.p, stride=c1.s) .+ c1.b)
 Conv1(w1::Int,w2::Int,cx::Int,cy::Int,f=relu; pdrop=0, padding=0, stride=1)= Conv1(param(w1,w2,cx,cy), param0(1,1,cy,1), f, pdrop, padding, stride)
 
 # Definition of a convolutional layer (with pooling):
-struct Conv2; w; b; f; pd; p; s; pw; ps end
+mutable struct Conv2; w; b; f; pd; p; s; pw; ps end
 (c2::Conv2)(x) = c2.f.(pool(conv4(c2.w, dropout(x,c2.pd); padding=c2.p, stride=c2.s) .+ c2.b; window=c2.pw, stride=c2.ps))
 Conv2(w1::Int,w2::Int,cx::Int,cy::Int,f=relu; pdrop=0, padding=0, stride=1, pwindow=3, pstride=2)= Conv2(param(w1,w2,cx,cy), param0(1,1,cy,1), f, pdrop, padding, stride, pwindow, pstride)
 
 # Define a convolutional layer:
-struct Conv; w; b; f; p; pad_conv; stri_conv; pad_pool; stri_pool; wind; end
+mutable struct Conv; w; b; f; p; pad_conv; stri_conv; pad_pool; stri_pool; wind; end
 (c::Conv)(x) = c.f.(pool(conv4(c.w, dropout(x,c.p); padding=c.pad_conv, stride=c.stri_conv) .+ c.b ;
         window=c.wind, padding=c.pad_pool, stride=c.stri_pool )) 
 Conv(w1::Int,w2::Int,cx::Int,cy::Int,f=relu;pdrop=0,pad_conv=(0,0),stri_conv=0,pad_pool=(0,0),stri_pool=0, wind=3)= Conv(param(w1,w2,cx,cy), param0(1,1,cy,1), f, pdrop ,pad_conv,stri_conv,pad_pool,stri_pool, wind)
@@ -31,7 +31,7 @@ Pooling(window=3, stride=2) = Pooling(window, stride)
 """
 
 # Definition of a Dense layer:
-struct Dense; w; b; f; p; end
+mutable struct Dense; w; b; f; p; end
 (d::Dense)(x) = d.f.(d.w * mat(dropout(x,d.p)) .+ d.b)
 Dense(i::Int,o::Int,f=relu;pdrop=0) = Dense(param(o,i), param0(o), f, pdrop)
 
@@ -67,182 +67,54 @@ function (c::Chain2)(x,y)
 end
 
 
+function generate_alexnet_model(; pretrained = true)
 
+    L1 = Conv2(11, 11, 3, 64; padding=2, stride=4);
+    L2 = Conv2( 5,  5, 64, 192; padding=2);
+    L3 = Conv1( 3,  3,  192, 384; padding=1);
+    L4 = Conv1( 3,  3,  384, 256; padding=1);
+    L5 = Conv2( 3,  3,  256, 256; padding=1);
+    L6 = Dense(256*6*6, 4096,pdrop=0.5);
+    L7 = Dense(4096, 4096, pdrop=0.5);
+    L8 = Dense(4096, 7, identity); 
 
-# Here is a single adam update:
-function adamGSupdate!(func, args1, args2, args3, v, G, t; lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
-    t=t+1
-    fval1 = @diff func(args1...)
-    fval2 = @diff func(args2...)
-    fval3 = @diff func(args3...)
-    for (w1,w2,w3) in zip(params(fval1),params(fval2),params(fval3))
-        g1 = grad(fval1, w1)
-        g2 = grad(fval1, w2)
-        g3 = grad(fval1, w3)        
+    if pretrained==true
+        state_dict = torch.load("/Users/ufukaltun/Downloads/alexnet-owt-7be5be79.pth");
 
-        MaskGS = abs.(sign.(g1).+sign.(g2).+sign.(g3)).==3
-        
-        g = (g1.+g2.+g3).*MaskGS
+        L1_w = permutedims(state_dict["features.0.weight"].detach().numpy(), (4, 3, 2, 1));
+        L1_b = state_dict["features.0.bias"].detach().numpy();
 
-        v = beta1 * v + (1 - beta1) * g
-        G = beta2 * G + (1 - beta2) * g .^ 2
-        vhat = v ./ (1 - beta1 ^ t)
-        Ghat = G ./ (1 - beta2 ^ t)
-        w1 = w1 - (lr / (sqrt(Ghat) + eps)) * vhat
+        L2_w = permutedims(state_dict["features.3.weight"].detach().numpy(), (4, 3, 2, 1));
+        L2_b = state_dict["features.3.bias"].detach().numpy();
+
+        L3_w = permutedims(state_dict["features.6.weight"].detach().numpy(), (4, 3, 2, 1));
+        L3_b = state_dict["features.6.bias"].detach().numpy();
+
+        L4_w = permutedims(state_dict["features.8.weight"].detach().numpy(), (4, 3, 2, 1));
+        L4_b = state_dict["features.8.bias"].detach().numpy();
+
+        L5_w = permutedims(state_dict["features.10.weight"].detach().numpy(), (4, 3, 2, 1));
+        L5_b = state_dict["features.10.bias"].detach().numpy();
+
+        L6_w = state_dict["classifier.1.weight"].detach().numpy();
+        L6_b = state_dict["classifier.1.bias"].detach().numpy();
+
+        L7_w = state_dict["classifier.4.weight"].detach().numpy();
+        L7_b = state_dict["classifier.4.bias"].detach().numpy();
+
+        L8_w = state_dict["classifier.6.weight"].detach().numpy()[1:7,:];
+        L8_b = state_dict["classifier.6.bias"].detach().numpy()[1:7];
+
+        L1.w = Param(L1_w);  L1.b = Param(reshape(L1_b, (1,1,:,1)));
+        L2.w = Param(L2_w);  L2.b = Param(reshape(L2_b, (1,1,:,1)));
+        L3.w = Param(L3_w);  L3.b = Param(reshape(L3_b, (1,1,:,1)));
+        L4.w = Param(L4_w);  L4.b = Param(reshape(L4_b, (1,1,:,1)));
+        L5.w = Param(L5_w);  L5.b = Param(reshape(L5_b, (1,1,:,1)));
+        L6.w = Param(L6_w);  L6.b = Param(L6_b);
+        L7.w = Param(L7_w);  L7.b = Param(L7_b);
+        L8.w = Param(L8_w);  L8.b = Param(L8_b);
     end
-    return value(fval1)
+
+    model = Chain2(L1, L2, L3, L4, L5, L6, L7, L8; λ1=5e-5);
+    return model
 end
-
-
-# Adam optimizer
-function adamGS(func, data; lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
-    v=0;
-    G=0;
-    t=0;
-    (adamGSupdate!(func, args1, args2, args3, v, G, t; lr=lr, beta1=beta1, beta2=beta2, eps=eps) for args in data)
-end
-
-
-# Here is a single adam update:
-function adam2update!(func, args1, args2, args3, v, G, t; lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
-    t=t+1
-    fval = @diff func(args...)
-    for w in params(fval)
-        g = grad(fval, w)
-        v = beta1 * v + (1 - beta1) * g
-        G = beta2 * G + (1 - beta2) * g .^ 2
-        vhat = v ./ (1 - beta1 ^ t)
-        Ghat = G ./ (1 - beta2 ^ t)
-        w = w - (lr / (sqrt(Ghat) + eps)) * vhat
-    end
-    return value(fval)
-end
-
-# Adam optimizer
-function adam2(func, data; lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
-    v=0;
-    G=0;
-    t=0;
-    (adam2update!(func, args1, args2, args3, v, G, t; lr=lr, beta1=beta1, beta2=beta2, eps=eps) for args in data)
-end
-
-
-
-
-
-
-# Definition of SGD update for Gradient Surgery:
-function sgdupdateGS!(func, args1, args2, args3; lr=0.1)
-    fval1 = @diff func(args1...)
-    fval2 = @diff func(args2...)
-    fval3 = @diff func(args3...)
-    for (param1,param2,param3) in zip(params(fval1),params(fval2),params(fval3))
-        ∇param1 = grad(fval1, param1)
-        ∇param2 = grad(fval2, param2)
-        ∇param3 = grad(fval3, param3)
-        
-        MaskGS = abs.(sign.(∇param1).+sign.(∇param2).+sign.(∇param3)).==3
-        
-        param1 .-= lr * ((∇param1.+∇param2.+∇param3).*MaskGS)
-
-    end
-    return value(fval1)
-end
-
-sgdGS(func, data1, data2, data3; lr=0.1) = 
-    (sgdupdateGS!(func, args1, args2, args3; lr=lr) for (args1, args2, args3) in zip(data1, data2, data3))
-    
-
-
-    
-    
-
-"""
-# Definition of SGD update for Gradient Surgery:
-function sgdupdateGS!(func, args1, args2, args3; lr=1e-5)
-    fval1 = @diff func(args1...)
-    fval2 = @diff func(args2...)
-    fval3 = @diff func(args3...)
-    for (param1,param2,param3) in zip(params(fval1),params(fval2),params(fval3))
-        ∇param1 = grad(fval1, param1)
-        ∇param2 = grad(fval2, param2)
-        ∇param3 = grad(fval3, param3)
-        
-        MaskGS = abs.(sign.(∇param1).+sign.(∇param2).+sign.(∇param3)).==3
-        
-        param1 .-= lr * ((∇param1.+∇param2.+∇param3).*MaskGS)
-
-    end
-    return value(fval1)
-end
-
-sgdGS(func, data1, data2, data3; lr=1e-5) = 
-    (sgdupdateGS!(func, args1, args2, args3; lr=lr) for (args1, args2, args3) in zip(data1, data2, data3))
-    
-    
-    
-    
-    # Definition of Adam update for Gradient Surgery:
-function adamupdateGS!(func, args1, args2, args3; lr=0.001, beta1= 0.9, beta2= 0.999)
-
-    fval1 = @diff func(args1...)
-    fval2 = @diff func(args2...)
-    fval3 = @diff func(args3...)
-    for (param1,param2,param3) in zip(params(fval1),params(fval2),params(fval3))
-        ∇param1 = grad(fval1, param1)
-        ∇param2 = grad(fval2, param2)
-        ∇param3 = grad(fval3, param3)
-        
-        MaskGS = abs.(sign.(∇param1).+sign.(∇param2).+sign.(∇param3)).==3
-        
-        
-        param1 .-= lr * ((∇param1.+∇param2.+∇param3).*MaskGS)
-
-
-
-v = beta1 * v + (1 - beta1) * g
-G = beta2 * G + (1 - beta2) * g .^ 2
-vhat = v ./ (1 - beta1 ^ t)
-Ghat = G ./ (1 - beta2 ^ t)
-w = w - (lr / (sqrt(Ghat) + eps)) * vhat
-
-    end
-    return value(fval1)
-end
-
-
-
-
-# Here is a single adam update:
-function adamupdate!(func, args, t; lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
-    t=t+1
-    fval = @diff func(args...)
-    for w in params(fval)
-        g = grad(fval, w)
-        v = beta1 * v + (1 - beta1) * g
-        G = beta2 * G + (1 - beta2) * g .^ 2
-        vhat = v ./ (1 - beta1 ^ t)
-        Ghat = G ./ (1 - beta2 ^ t)
-        w = w - (lr / (sqrt(Ghat) + eps)) * vhat
-    end
-    return value(fval)
-end
-
-# Adam optimizer
-function adam(func, data; lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8)
-    v=0;
-    G=0;
-    t=0;
-    adamupdate!(func, args, t; lr=lr, beta1=beta1, beta2=beta2, eps=eps) for args in data
-end
-
-
-v = beta1 * v + (1 - beta1) * g
-G = beta2 * G + (1 - beta2) * g .^ 2
-vhat = v ./ (1 - beta1 ^ t)
-Ghat = G ./ (1 - beta2 ^ t)
-w = w - (lr / (sqrt(Ghat) + eps)) * vhat
-
-
-
-"""
