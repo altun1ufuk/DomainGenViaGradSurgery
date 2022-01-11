@@ -14,17 +14,19 @@ function read_data(data_path,image_size)
         for img in readdir(directory)
             arr_img=load(string(directory,"/",img))
             if size(arr_img) != image_size
-              arr_img = imresize(arr_img, image_size);
+                arr_img = imresize(arr_img, image_size);
             end
             arr_img=channelview(arr_img)
-            arr_img = permutedims(arr_img, (2, 3, 1))
-            if first_r==false
-                x=cat(x,arr_img,dims=4)
-            else
-                x=cat(arr_img,dims=4)
+            if size(arr_img) == (3,227,227)
+                arr_img = permutedims(arr_img, (2, 3, 1))
+                if first_r==false
+                    x=cat(x,arr_img,dims=4)
+                else
+                    x=cat(arr_img,dims=4)
+                end
+                push!(y,i)
+                first_r=false
             end
-            push!(y,i)
-            first_r=false
         end
         i+=1
         end
@@ -170,3 +172,146 @@ function PACS(data_path::AbstractString, batchsize, atype, target)
     
     return d_trn, d_val, d_tst, d_trn_dom1, d_trn_dom2, d_trn_dom3
 end
+
+
+
+
+struct VLCS
+    Caltech101_x
+    Caltech101_y
+    LabelMe_x
+    LabelMe_y
+    SUN09_x
+    SUN09_y
+    VOC2007_x
+    VOC2007_y
+    function VLCS(data_path::AbstractString, s1, s2)
+        directory=string(data_path,"/Caltech101")
+        Caltech101_x, Caltech101_y = read_data(directory,(s1,s2));
+        save("Caltech101_x.jld2","data",Caltech101_x)
+        save("Caltech101_y.jld2","data",Caltech101_y)
+        println("Domain: Caltech101")
+
+        directory=string(data_path,"/LabelMe")
+        LabelMe_x, LabelMe_y = read_data(directory,(s1,s2));
+        save("LabelMe_x.jld2","data",LabelMe_x)
+        save("LabelMe_y.jld2","data",LabelMe_y)
+        println("Domain: LabelMe")
+
+        directory=string(data_path,"/SUN09")
+        SUN09_x, SUN09_y = read_data(directory,(s1,s2));
+        save("SUN09_x.jld2","data",SUN09_x)
+        save("SUN09_y.jld2","data",SUN09_y)
+        println("Domain: SUN09")
+
+        directory=string(data_path,"/VOC2007")
+        VOC2007_x, VOC2007_y = read_data(directory,(s1,s2));
+        save("VOC2007_x.jld2","data",VOC2007_x)
+        save("VOC2007_y.jld2","data",VOC2007_y)
+        println("Domain: VOC2007")
+        new(Caltech101_x, Caltech101_y, LabelMe_x, LabelMe_y, SUN09_x, SUN09_y, VOC2007_x, VOC2007_y)
+    end
+    function VLCS(data_path::AbstractString)
+        Caltech101_x=load(string(data_path,"/Caltech101_x.jld2"))["data"];
+        Caltech101_y=load(string(data_path,"/Caltech101_y.jld2"))["data"];
+
+        LabelMe_x=load(string(data_path,"/LabelMe_x.jld2"))["data"];
+        LabelMe_y=load(string(data_path,"/LabelMe_y.jld2"))["data"];
+
+        SUN09_x=load(string(data_path,"/SUN09_x.jld2"))["data"];
+        SUN09_y=load(string(data_path,"/SUN09_y.jld2"))["data"];
+
+        VOC2007_x=load(string(data_path,"/VOC2007_x.jld2"))["data"];
+        VOC2007_y=load(string(data_path,"/VOC2007_y.jld2"))["data"];
+        new(Caltech101_x, Caltech101_y, LabelMe_x, LabelMe_y, SUN09_x, SUN09_y, VOC2007_x, VOC2007_y)
+    end
+end
+
+function VLCS(data_path::AbstractString, batchsize, atype, target)
+    data = VLCS(data_path)
+    
+            ind = randperm(size(data.Caltech101_x,4))
+            val_size = Int(floor(size(data.Caltech101_x,4)*0.1))
+            test_size = Int(floor(size(data.Caltech101_x,4)*0.2))
+            Caltech101_x = data.Caltech101_x[:,:,:,ind];
+            Caltech101_y = data.Caltech101_y[ind];
+                Caltech101_val_x = Caltech101_x[:,:,:,1:val_size]
+                Caltech101_tst_x = Caltech101_x[:,:,:,val_size+1:val_size+test_size]
+                Caltech101_trn_x = Caltech101_x[:,:,:,val_size+test_size+1:end]
+                    Caltech101_val_y = Caltech101_y[1:val_size]
+                    Caltech101_tst_y = Caltech101_y[val_size+1:val_size+test_size]
+                    Caltech101_trn_y = Caltech101_y[val_size+test_size+1:end]
+            ind = randperm(size(data.LabelMe_x,4))
+            val_size = Int(floor(size(data.LabelMe_x,4)*0.1))
+            test_size = Int(floor(size(data.LabelMe_x,4)*0.2))
+            LabelMe_x = data.LabelMe_x[:,:,:,ind];
+            LabelMe_y = data.LabelMe_y[ind];
+                LabelMe_val_x = LabelMe_x[:,:,:,1:val_size]
+                LabelMe_tst_x = LabelMe_x[:,:,:,val_size+1:val_size+test_size]
+                LabelMe_trn_x = LabelMe_x[:,:,:,val_size+test_size+1:end]
+                    LabelMe_val_y = LabelMe_y[1:val_size]
+                    LabelMe_tst_y = LabelMe_y[val_size+1:val_size+test_size]
+                    LabelMe_trn_y = LabelMe_y[val_size+test_size+1:end]
+            ind = randperm(size(data.SUN09_x,4))
+            val_size = Int(floor(size(data.SUN09_x,4)*0.1))
+            test_size = Int(floor(size(data.SUN09_x,4)*0.2))
+            SUN09_x = data.SUN09_x[:,:,:,ind];
+            SUN09_y = data.SUN09_y[ind];
+                SUN09_val_x = SUN09_x[:,:,:,1:val_size]
+                SUN09_tst_x = SUN09_x[:,:,:,val_size+1:val_size+test_size]
+                SUN09_trn_x = SUN09_x[:,:,:,val_size+test_size+1:end]
+                    SUN09_val_y = SUN09_y[1:val_size]
+                    SUN09_tst_y = SUN09_y[val_size+1:val_size+test_size]
+                    SUN09_trn_y = SUN09_y[val_size+test_size+1:end]
+            ind = randperm(size(data.VOC2007_x,4))
+            val_size = Int(floor(size(data.VOC2007_x,4)*0.1))
+            test_size = Int(floor(size(data.VOC2007_x,4)*0.2))
+            VOC2007_x = data.VOC2007_x[:,:,:,ind];
+            VOC2007_y = data.VOC2007_y[ind];
+                VOC2007_val_x = VOC2007_x[:,:,:,1:val_size]
+                VOC2007_tst_x = VOC2007_x[:,:,:,val_size+1:val_size+test_size]
+                VOC2007_trn_x = VOC2007_x[:,:,:,val_size+test_size+1:end]
+                    VOC2007_val_y = VOC2007_y[1:val_size]
+                    VOC2007_tst_y = VOC2007_y[val_size+1:val_size+test_size]
+                    VOC2007_trn_y = VOC2007_y[val_size+test_size+1:end]
+ 
+
+    if target == "VOC2007"
+        d_trn = Knet.minibatch(cat(Caltech101_trn_x, LabelMe_trn_x, SUN09_trn_x, dims=4), cat(Caltech101_trn_y, LabelMe_trn_y, SUN09_trn_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_val = Knet.minibatch(cat(Caltech101_val_x, LabelMe_val_x, SUN09_val_x, dims=4), cat(Caltech101_val_y, LabelMe_val_y, SUN09_val_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_tst = Knet.minibatch(VOC2007_tst_x,VOC2007_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom1 = Knet.minibatch(SUN09_tst_x,SUN09_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom2 = Knet.minibatch(LabelMe_tst_x,LabelMe_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom3 = Knet.minibatch(Caltech101_tst_x,Caltech101_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        
+    elseif target == "SUN09"
+        d_trn = Knet.minibatch(cat(Caltech101_trn_x, LabelMe_trn_x, VOC2007_trn_x, dims=4), cat(Caltech101_trn_y, LabelMe_trn_y, VOC2007_trn_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_val = Knet.minibatch(cat(Caltech101_val_x, LabelMe_val_x, VOC2007_val_x, dims=4), cat(Caltech101_val_y, LabelMe_val_y, VOC2007_val_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_tst = Knet.minibatch(SUN09_tst_x,SUN09_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom1 = Knet.minibatch(VOC2007_tst_x,VOC2007_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom2 = Knet.minibatch(LabelMe_tst_x,LabelMe_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom3 = Knet.minibatch(Caltech101_tst_x,Caltech101_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        
+    elseif target == "LabelMe"
+        d_trn = Knet.minibatch(cat(Caltech101_trn_x, SUN09_trn_x, VOC2007_trn_x, dims=4), cat(Caltech101_trn_y, SUN09_trn_y, VOC2007_trn_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_val = Knet.minibatch(cat(Caltech101_val_x, SUN09_val_x, VOC2007_val_x, dims=4), cat(Caltech101_val_y, SUN09_val_y, VOC2007_val_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_tst = Knet.minibatch(LabelMe_tst_x,LabelMe_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom1 = Knet.minibatch(VOC2007_tst_x,VOC2007_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom2 = Knet.minibatch(SUN09_tst_x,SUN09_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom3 = Knet.minibatch(Caltech101_tst_x,Caltech101_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        
+    elseif target == "Caltech101"
+        d_trn = Knet.minibatch(cat(LabelMe_trn_x, SUN09_trn_x, VOC2007_trn_x, dims=4), cat(LabelMe_trn_y, SUN09_trn_y, VOC2007_trn_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_val = Knet.minibatch(cat(LabelMe_val_x, SUN09_val_x, VOC2007_val_x, dims=4), cat(LabelMe_val_y, SUN09_val_y, VOC2007_val_y, dims=1), batchsize*3, shuffle=true, xtype=atype, ytype=Array{Int32});
+        d_tst = Knet.minibatch(Caltech101_tst_x,Caltech101_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom1 = Knet.minibatch(VOC2007_tst_x,VOC2007_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom2 = Knet.minibatch(SUN09_tst_x,SUN09_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+        d_trn_dom3 = Knet.minibatch(LabelMe_tst_x,LabelMe_tst_y,batchsize,shuffle=true,xtype=atype,ytype=Array{Int32});
+    else
+        println("No valid target")
+    end
+    
+    return d_trn, d_val, d_tst, d_trn_dom1, d_trn_dom2, d_trn_dom3
+end
+
+         

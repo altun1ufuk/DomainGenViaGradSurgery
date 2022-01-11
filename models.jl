@@ -67,7 +67,7 @@ function (c::Chain2)(x,y)
 end
 
 
-function generate_alexnet_model(; pretrained = true)
+function generate_alexnet_model(n_classes; pretrained = true)
 
     L1 = Conv2(11, 11, 3, 64; padding=2, stride=4);
     L2 = Conv2( 5,  5, 64, 192; padding=2);
@@ -76,7 +76,7 @@ function generate_alexnet_model(; pretrained = true)
     L5 = Conv2( 3,  3,  256, 256; padding=1);
     L6 = Dense(256*6*6, 4096,pdrop=0.5);
     L7 = Dense(4096, 4096, pdrop=0.5);
-    L8 = Dense(4096, 7, identity); 
+    L8 = Dense(4096, n_classes, identity); 
 
     if pretrained==true
         state_dict = torch.load("/Users/ufukaltun/Downloads/alexnet-owt-7be5be79.pth");
@@ -102,8 +102,8 @@ function generate_alexnet_model(; pretrained = true)
         L7_w = state_dict["classifier.4.weight"].detach().numpy();
         L7_b = state_dict["classifier.4.bias"].detach().numpy();
 
-        L8_w = state_dict["classifier.6.weight"].detach().numpy()[1:7,:];
-        L8_b = state_dict["classifier.6.bias"].detach().numpy()[1:7];
+        L8_w = state_dict["classifier.6.weight"].detach().numpy()[1:n_classes,:];
+        L8_b = state_dict["classifier.6.bias"].detach().numpy()[1:n_classes];
 
         L1.w = Param(L1_w);  L1.b = Param(reshape(L1_b, (1,1,:,1)));
         L2.w = Param(L2_w);  L2.b = Param(reshape(L2_b, (1,1,:,1)));

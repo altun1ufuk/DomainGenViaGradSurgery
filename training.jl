@@ -15,6 +15,18 @@ if dataset == "PACS"
 
           tst_loss, tst_acc = train_gs(model, d_trn, d_val, d_tst, d_trn_dom1, d_trn_dom2, d_trn_dom3, check_freq, num_iter, target)
     end
+elseif dataset == "VLCS"
+    d_trn, d_val, d_tst, d_trn_dom1, d_trn_dom2, d_trn_dom3 = VLCS(data_path, batchsize, atype, target);
+    println("Datasets are loaded")
+
+    if mode == "b"
+
+          tst_loss, tst_acc = train_b(model, d_trn, d_val, d_tst, check_freq, num_iter, target)
+
+    elseif mode == "gs"
+
+          tst_loss, tst_acc = train_gs(model, d_trn, d_val, d_tst, d_trn_dom1, d_trn_dom2, d_trn_dom3, check_freq, num_iter, target)
+    end
 else
     println("Invalid dataset")
 end
