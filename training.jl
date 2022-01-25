@@ -1,6 +1,6 @@
 include("preprocess.jl");
 
-function train(mode, dataset, target, model; num_iter=1000, check_freq=50, batchsize=128, data_path="/Users/ufukaltun/Documents/koç/dersler/ku deep learning/project", atype=Array{Float32})
+function train(mode, dataset, target, model; num_iter=1000, check_freq=50, batchsize=128, data_path="/Users/ufukaltun/Documents/koç/dersler/ku deep learning/project/data", atype=Array{Float32})
 
 
 if dataset == "PACS"

@@ -17,6 +17,11 @@ mutable struct Conv2; w; b; f; pd; p; s; pw; ps end
 (c2::Conv2)(x) = c2.f.(pool(conv4(c2.w, dropout(x,c2.pd); padding=c2.p, stride=c2.s) .+ c2.b; window=c2.pw, stride=c2.ps))
 Conv2(w1::Int,w2::Int,cx::Int,cy::Int,f=relu; pdrop=0, padding=0, stride=1, pwindow=3, pstride=2)= Conv2(param(w1,w2,cx,cy), param0(1,1,cy,1), f, pdrop, padding, stride, pwindow, pstride)
 
+# Definition of a convolutional layer (with pooling):
+mutable struct Conv3; w; b; f; pd; p; s; pw; ps end
+(c3::Conv3)(x) = c2.f.(pool(pool(conv4(c2.w, dropout(x,c2.pd); padding=c2.p, stride=c2.s) .+ c2.b; window=c2.pw, stride=c2.ps);mode=2))
+Conv3(w1::Int,w2::Int,cx::Int,cy::Int,f=relu; pdrop=0, padding=0, stride=1, pwindow=3, pstride=2)= Conv2(param(w1,w2,cx,cy), param0(1,1,cy,1), f, pdrop, padding, stride, pwindow, pstride)
+
 # Define a convolutional layer:
 mutable struct Conv; w; b; f; p; pad_conv; stri_conv; pad_pool; stri_pool; wind; end
 (c::Conv)(x) = c.f.(pool(conv4(c.w, dropout(x,c.p); padding=c.pad_conv, stride=c.stri_conv) .+ c.b ;
@@ -79,7 +84,7 @@ function generate_alexnet_model(n_classes; pretrained = true)
     L8 = Dense(4096, n_classes, identity); 
 
     if pretrained==true
-        state_dict = torch.load("/Users/ufukaltun/Downloads/alexnet-owt-7be5be79.pth");
+        state_dict = torch.load("/Users/ufukaltun/Documents/koç/dersler/ku deep learning/project/alexnet-owt-7be5be79.pth");
 
         L1_w = permutedims(state_dict["features.0.weight"].detach().numpy(), (4, 3, 2, 1));
         L1_b = state_dict["features.0.bias"].detach().numpy();
@@ -115,6 +120,6 @@ function generate_alexnet_model(n_classes; pretrained = true)
         L8.w = Param(L8_w);  L8.b = Param(L8_b);
     end
 
-    model = Chain2(L1, L2, L3, L4, L5, L6, L7, L8; λ1=5e-5);
+    model = Chain2(L1, L2, L3, L4, L5, L6, L7, L8; λ2=0);
     return model
 end
